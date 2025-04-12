@@ -4,3 +4,5 @@ requests
 beautifulsoup4
 duckduckgo-search
 flask
+asyncio
+datetime

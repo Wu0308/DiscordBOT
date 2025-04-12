@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import random
 from duckduckgo_search import DDGS
+import os
 
 #環境變數API Key
 openai_api_key = os.environ["OPENAI_API_KEY"]

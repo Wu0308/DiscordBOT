@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 import random
 from duckduckgo_search import DDGS
 import os
+from keep_alive import keep_alive
+
+keep_alive()  # 在 bot 啟動前呼叫，這樣就會開一個 web port 給 Render 看
 
 #環境變數API Key
 openai_api_key = os.environ["OPENAI_API_KEY"]

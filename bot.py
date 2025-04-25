@@ -47,7 +47,9 @@ def search_youtube(query):
         'quiet': True,
         'default_search': 'ytsearch',
         'source_address': '0.0.0.0',  # 防止 IPv6 問題
-        'cookiefile': 'cookies.txt'
+        'cookiefile': 'cookies.txt',
+        'nocheckcertificate': True,
+        'ignoreerrors': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:

@@ -29,6 +29,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+
+# 音樂播放狀態與佇列
+song_queue = []
+now_playing = None
+is_paused = False
+
 @bot.event
 async def on_ready():
     print(f'🤖 Bot 已上線：{bot.user}')
@@ -41,7 +47,7 @@ def search_youtube(query):
         'quiet': True,
         'default_search': 'ytsearch',
         'source_address': '0.0.0.0',  # 防止 IPv6 問題
-        "cookies": "cookies.txt"
+        'cookiefile': 'cookies.txt'
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:

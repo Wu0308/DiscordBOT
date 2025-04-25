@@ -11,6 +11,7 @@ import asyncio
 from datetime import datetime
 import yt_dlp
 from discord import FFmpegPCMAudio
+import functools
 
 keep_alive()  # 在 bot 啟動前呼叫，這樣就會開一個 web port 給 Render 看
 
@@ -67,9 +68,16 @@ async def play_next(ctx):
         now_playing = song
         vc = ctx.voice_client
 
+        def after_playing(error):
+            fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
+            try:
+                fut.result()
+            except Exception as e:
+                print(f"播放下一首時發生錯誤: {e}")
+
         vc.play(
             discord.FFmpegPCMAudio(song['source'], before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", executable=FFMPEG_PATH),
-            after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
+            after=after_playing
         )
         await ctx.send(f"🎵 現在播放：{song['title']}")
     else:

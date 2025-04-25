@@ -14,6 +14,9 @@ from discord import FFmpegPCMAudio
 
 keep_alive()  # 在 bot 啟動前呼叫，這樣就會開一個 web port 給 Render 看
 
+# 設定 ffmpeg binary 路徑
+FFMPEG_PATH = "./bin/ffmpeg"
+
 #環境變數API Key
 openai_api_key = os.environ["OPENAI_API_KEY"]
 discord_token = os.environ["DISCORD_TOKEN"]
@@ -56,7 +59,7 @@ async def play_next(ctx):
         vc = ctx.voice_client
 
         vc.play(
-            discord.FFmpegPCMAudio(song['source'], before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"),
+            discord.FFmpegPCMAudio(song['source'], before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5", executable=FFMPEG_PATH),
             after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
         )
         await ctx.send(f"🎵 現在播放：{song['title']}")

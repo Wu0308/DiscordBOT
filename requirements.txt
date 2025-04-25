@@ -6,3 +6,6 @@ duckduckgo-search
 flask
 asyncio
 datetime
+yt-dlp
+python-dotenv
+ffmpeg-python

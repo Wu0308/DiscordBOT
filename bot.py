@@ -7,6 +7,10 @@ import random
 from duckduckgo_search import DDGS
 import os
 from keep_alive import keep_alive
+import asyncio
+from datetime import datetime
+import yt_dlp
+from discord import FFmpegPCMAudio
 
 keep_alive()  # 在 bot 啟動前呼叫，這樣就會開一個 web port 給 Render 看
 
@@ -25,6 +29,40 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 @bot.event
 async def on_ready():
     print(f'🤖 Bot 已上線：{bot.user}')
+
+# 使用 yt_dlp 搜尋並取得音訊 URL
+def search_youtube(query):
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'noplaylist': True,
+        'quiet': True,
+        'default_search': 'ytsearch',
+        'source_address': '0.0.0.0'  # 防止 IPv6 問題
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(query, download=False)
+            video = info['entries'][0] if 'entries' in info else info
+            return {'source': video['url'], 'title': video['title']}
+        except Exception as e:
+            print(f"❗搜尋錯誤: {e}")
+            return None
+
+async def play_next(ctx):
+    global now_playing
+    if song_queue:
+        song = song_queue.pop(0)
+        now_playing = song
+        vc = ctx.voice_client
+
+        vc.play(
+            discord.FFmpegPCMAudio(song['source'], before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"),
+            after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
+        )
+        await ctx.send(f"🎵 現在播放：{song['title']}")
+    else:
+        now_playing = None
+        await ctx.send("📭 歌單已清空。")
 
 # 基本對話指令
 @bot.command()
@@ -145,9 +183,6 @@ async def search(ctx, *, query: str):
     except Exception as e:
         await ctx.send(f"⚠️ 發生錯誤：{e}")
 
-import asyncio
-from datetime import datetime
-
 @bot.command()
 async def remind(ctx, month_day: str, time_str: str, *, reminder: str):
     try:
@@ -176,7 +211,74 @@ async def remind(ctx, month_day: str, time_str: str, *, reminder: str):
     except Exception as e:
         await ctx.send(f"⚠️ 發生錯誤：{e}")
 
+@bot.command(name="music")
+async def music(ctx, *, search: str):
+    if not ctx.author.voice:
+        await ctx.send("❗請先加入語音頻道")
+        return
 
+    voice_channel = ctx.author.voice.channel
+    if not ctx.voice_client:
+        await voice_channel.connect()
+
+    song = search_youtube(search)
+    if song:
+        song_queue.append(song)
+        await ctx.send(f"✅ 已加入：{song['title']}")
+
+        if not ctx.voice_client.is_playing() and not is_paused:
+            await play_next(ctx)
+    else:
+        await ctx.send("❗找不到這首歌")
+
+@bot.command(name="skip")
+async def skip(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.stop()
+        await ctx.send("⏭️ 已跳過歌曲")
+    else:
+        await ctx.send("❗沒有正在播放的歌曲")
+
+@bot.command(name="pause")
+async def pause(ctx):
+    global is_paused
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
+        is_paused = True
+        await ctx.send("⏸️ 已暫停音樂")
+    else:
+        await ctx.send("❗沒有正在播放的歌曲")
+
+@bot.command(name="play")
+async def resume(ctx):
+    global is_paused
+    if ctx.voice_client and is_paused:
+        ctx.voice_client.resume()
+        is_paused = False
+        await ctx.send("▶️ 繼續播放")
+    else:
+        await ctx.send("❗目前沒有暫停的音樂")
+
+@bot.command(name="show")
+async def show(ctx):
+    if now_playing:
+        msg = f"🎶 現正播放：{now_playing['title']}\n"
+    else:
+        msg = "🎶 現在沒有播放的音樂\n"
+
+    if song_queue:
+        msg += "\n📜 歌單：\n" + "\n".join([f"{i+1}. {song['title']}" for i, song in enumerate(song_queue)])
+    else:
+        msg += "\n📭 歌單是空的"
+
+    await ctx.send(msg)
+
+@bot.command(name="leave")
+async def leave(ctx):
+    if ctx.voice_client:
+        await ctx.voice_client.disconnect()
+        song_queue.clear()
+        await ctx.send("👋 已離開語音頻道")
 
         
 # help顯示指令提示
@@ -184,21 +286,28 @@ async def remind(ctx, month_day: str, time_str: str, *, reminder: str):
 async def help(ctx):
     help_text = """
 📘 **指令說明列表：**
+`[]`表示必填 `{}`表示選填
 
 `!hello` - 和機器人打招呼  
 `!mom` - 幹你媽  
 `!add [數字1] [數字2]` - 加法計算
 `!ask [問題]` - 問 ChatGPT 一個問題  
-`!image [關鍵字] [數量]` - 搜尋圖片並隨機顯示結果
-`!video [關鍵字] [數量]` - 搜尋影片並依順序顯示結果
-`!search [關鍵字] [數量]` - 搜尋網頁並回傳指定筆數的結果
-`!remind [月/日] [時:分] [提醒內容]` - 設定提醒功能 
+`!image [關鍵字] {數量}` - 搜尋圖片並隨機顯示結果
+`!video [關鍵字] {數量}` - 搜尋影片並依順序顯示結果
+`!search [關鍵字] {數量}` - 搜尋網頁並回傳指定筆數的結果
+`!remind [月/日] [時:分] [提醒內容]` - 設定提醒功能
+`!music [音樂]` - 加入音樂到撥放清單
+`!show` - 顯示音樂播放清單
+`!pause` - 暫停撥放
+`!play` - 繼續撥放
+`!skip` - 跳過這首歌 
 
 👉 範例：
-- `!image 狗`
-- `!image 夜景 5`
+- `!image 狗 3`
+- `!video 夜景 5`
 - `!ask 寫一首詩給我`
-- `!remind [4/13 17:00] [聚會]`
+- `!remind 4/13 17:00 聚會`
+- `!music 周杰倫`
 
 """
     await ctx.send(help_text)

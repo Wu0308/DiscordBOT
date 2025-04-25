@@ -40,7 +40,8 @@ def search_youtube(query):
         'noplaylist': True,
         'quiet': True,
         'default_search': 'ytsearch',
-        'source_address': '0.0.0.0'  # 防止 IPv6 問題
+        'source_address': '0.0.0.0',  # 防止 IPv6 問題
+        "cookies": "cookies.txt"
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
